@@ -1,0 +1,48 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Locate gradlew
+        id: locate
+        run: |
+          set -e
+          GRADLEW_PATH=$(find . -maxdepth 5 -type f -name "gradlew" | head -n 1)
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "❌ gradlew not found. Your project is missing the Gradle wrapper."
+            echo "Top-level files/folders:"
+            ls -la
+            exit 1
+          fi
+          echo "✅ Found gradlew at: $GRADLEW_PATH"
+          echo "gradlew_path=$GRADLEW_PATH" >> $GITHUB_OUTPUT
+          echo "gradlew_dir=$(dirname "$GRADLEW_PATH")" >> $GITHUB_OUTPUT
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x "${{ steps.locate.outputs.gradlew_path }}"
+
+      - name: Build Debug APK
+        working-directory: ${{ steps.locate.outputs.gradlew_dir }}
+        run: ./gradlew assembleDebug
+
+      - name: Upload Debug APK(s)
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apks
+          path: "**/build/outputs/apk/debug/*.apk"
